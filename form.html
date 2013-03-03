@@ -1,0 +1,51 @@
+<html>
+<head>
+
+</head>
+
+<body>
+        <form action="http://192.168.1.128/SAVECONFIG" method="GET">
+                <table>
+                  <tr>
+	                        <td> Config Slot </td>
+	                        <td>
+	                                <select name="slot">
+									  <option value="0">0</option>
+	                                  <option value="1">1</option>
+	                                  <option value="2">2</option>
+	                                  <option value="3">3</option>
+	                                  <option value="4">4</option>
+	                                </select>
+	                        </td>
+	                </tr>
+
+                <tr>
+                        <td> Name:  </td> <td><input type="text" name="name"> </td>
+                </tr>
+                <tr>
+                        <td> Input pin:</td> <td> <input type="text" name="inputPin"></td>
+                </tr>
+                <tr>
+                        <td> Output pin: </td> <td> <input type="text" name="outputPin"> </td>
+                </tr>
+                <tr>
+                        <td> State: </td> <td> <input type="text" name="state"> </td>
+                </tr>
+                <tr>
+                        <td> Type </td>
+                        <td>
+                                <select name="type">
+                                  <option value="0">Switch + Relay</option>
+                                  <option value="1">PWM Output</option>
+                                  <option value="2">Sensor Alarma</option>
+                                  <option value="3">Sensor (Otro)</option>
+                                </select>
+                        </td>
+                </tr>
+                <tr>
+                        <td><input type="submit" name="accept" value="Accept"/></td>
+                </tr>
+                </table>
+        </form>
+</body>
+</html>
