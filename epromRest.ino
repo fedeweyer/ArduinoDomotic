@@ -4,7 +4,9 @@
 #define SWITCH_TYPE 0
 #define PWM_TYPE 1
 #define SENSOR_TEMPERATURA_TYPE 2
+#define PULSADOR_TYPE 3
 
+#define SLOTS_QTY 8
 
 
 #include <SPI.h>
@@ -24,7 +26,7 @@ Server server(80);
 #endif
 
 int address = 10;
-const int numberOfInputs = 4 ;
+//const int SLOTS_QTY = 4 ;
 int cantidadSwitchs = 0;
 int i = 0; //utilizada para los contadores
 typedef struct
@@ -37,7 +39,7 @@ typedef struct
 }  
 input_type;
 
-input_type config[numberOfInputs];
+input_type config[SLOTS_QTY];
 
 Bounce *bouncer;
 
@@ -47,7 +49,7 @@ void loadConfig (){
   EEPROM.readBlock(address, config);
 #if DEBUG
   Serial.println("Ep read"); 
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     Serial.print("n: ");  
     Serial.println(config[i].name);   
     Serial.print("i: ");  
@@ -88,7 +90,7 @@ void createConfig () {
 
   config[3].input = 5;
   config[3].output = 8;//
-  config[3].type = 0;
+  config[3].type = 3;
   config[3].state = 1;//
   nombre = "trc";
   nombre.toCharArray(config[3].name,15);
@@ -106,7 +108,7 @@ String configToJson() {
   String configStr = String();
   configStr += "{\"";
   configStr += "conf\" : [";
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     configStr += "{\"i\":";
     configStr += config[i].input;
     configStr += ",";
@@ -122,7 +124,7 @@ String configToJson() {
     configStr += "\"n\":\"";
     configStr += config[i].name;
     configStr += "\"}";
-    if (i < (numberOfInputs - 1)){
+    if (i < (SLOTS_QTY - 1)){
       configStr += ",";
     }
 
@@ -130,7 +132,7 @@ String configToJson() {
   configStr += "]}";
 
   //no se utiliza el nombre para la ejecucion del programa por eso se lo vuela de la sram
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     memset(config[i].name , 0, sizeof config[i].name );
   }
   /*
@@ -145,7 +147,7 @@ String configToJson() {
 //usado para lo que llega por ethernet, porque fuerza estado
 void updateOutput(int pin, int state){
 
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     if (config[i].output==pin){
       if (state){
         digitalWrite(pin, HIGH);
@@ -164,7 +166,7 @@ void updateOutput(int pin, int state){
 //usado para los switchs, que solo invierten
 void changeOutput(int pin){
 
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     if (config[i].output==pin){
       if (digitalRead(pin)){
         digitalWrite(pin, LOW);
@@ -199,10 +201,10 @@ void setup()
   createConfig(); 
   loadConfig ();
 
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     //Se aprovecha el for para eliminar el name de la config en ejecucion
     memset(config[i].name , 0, sizeof config[i].name );
-    if (config[i].type==SWITCH_TYPE){
+    if (config[i].type==SWITCH_TYPE || config[i].type==PULSADOR_TYPE){
       cantidadSwitchs++;
     }
   }
@@ -210,7 +212,7 @@ void setup()
 
   int bouncerIndex=0;
   //Rutina de inicializacion de estado y configuracion
-  for ( i = 0; i < numberOfInputs; i++) {
+  for ( i = 0; i < SLOTS_QTY; i++) {
     if (config[i].input!=-1){
       pinMode(config[i].input , INPUT); 
     }
@@ -218,7 +220,8 @@ void setup()
     if (config[i].output!=-1){
       pinMode(config[i].output, OUTPUT);  
     }
-    if (config[i].type==SWITCH_TYPE){
+    if (config[i].type==SWITCH_TYPE || config[i].type==PULSADOR_TYPE){
+      //Analizar el state, creo que no va mas
       if (config[i].state){
         digitalWrite(config[i].output, HIGH);
       } 
@@ -267,11 +270,17 @@ void loop()
     if (bouncer[i].update()){
       int indexAux=0;
       int h;  
-      for ( h = 0; h < numberOfInputs; h++) {
+      for ( h = 0; h < SLOTS_QTY; h++) {
 
-        if (config[h].type==SWITCH_TYPE){
+        if (config[h].type==SWITCH_TYPE || config[h].type==PULSADOR_TYPE){
           if (indexAux==i){
-            changeOutput(config[h].output);
+            if (config[h].type==SWITCH_TYPE){
+              changeOutput(config[h].output);
+            }else{
+              if (bouncer[i].risingEdge()){
+                changeOutput(config[h].output);
+              }
+            }
 
 #if DEBUG
             Serial.print("Cambio en pin: ");
@@ -372,7 +381,7 @@ void loop()
         char *value = strtok(NULL,"/");
 
         //  this is where we actually *do something*!
-        char outValue[10] = "MU";
+        char outValue[20] = "MU";
         String jsonOut = String();
         if (urlString!="/FAVICON.ICO"){
 
@@ -479,19 +488,22 @@ void loop()
                     Serial.println("digital");
 #endif
 
-                    for ( i = 0; i < numberOfInputs; i++) {
+                    for ( i = 0; i < SLOTS_QTY; i++) {
                       if (config[i].type==SENSOR_TEMPERATURA_TYPE){
                         if (config[i].input==selectedPin){
                           DHT11.read();
-                          /*
+                          
                           String out ="<t>";
                           out+="</t>";
                           out+="<h>";
                           out+="</h";
                           //client.println(out);
-                          sprintf(outValue,"%s",out);
-                          */
-#if DEBUG                         
+                         
+                          //sprintf(outValue,"%s","ON");
+                          sprintf(outValue,"<t>%d</t><h>%d</h>",DHT11.temperature,DHT11.humidity);
+                          //sprintf(outValue,"%s",out);
+
+#if DEBUG                    
                           Serial.print("Humidity (%): ");
                           Serial.println((float)DHT11.humidity, DEC);
 
@@ -499,8 +511,8 @@ void loop()
                           Serial.println((float)DHT11.temperature, DEC);
 #endif
                         }
-                      } 
-                      else if (config[i].type==SWITCH_TYPE){
+                      }
+                      else if (config[i].type==SWITCH_TYPE || config[i].type==PULSADOR_TYPE){
                         if (config[i].output==selectedPin){
 
                           int inValue = digitalRead(selectedPin);
